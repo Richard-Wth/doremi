@@ -52,7 +52,7 @@ from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
 from doremi.training_args import ModelArguments, DataTrainingArguments, FullTrainingArguments
 import doremi.dataloader as data_utils
-from doremi.trainer import DoReMiTrainer
+from doremi.trainer import DoReMiTrainer, DoReMiBucketTrainer
 import doremi.models as doremi_models
 try:
     from flash_attn.models.gpt_neox import gpt_neox_config_to_gpt2_config
@@ -67,6 +67,11 @@ require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/lang
 
 logger = logging.getLogger(__name__)
 
+def check_number(iter_dataset):
+    i = 0
+    for _ in iter_dataset:
+        i += 1
+    return i
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -205,6 +210,7 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
     tokenizer.model_max_length = data_args.max_token_length
+    tokenizer.pad_token = tokenizer.eos_token
 
     if model_args.model_name_or_path:
         torch_dtype = (
@@ -322,9 +328,17 @@ def main():
     #     model.resize_token_embeddings(len(tokenizer))
 
     torch.cuda.empty_cache()
+    # print("Below is the information of training dataset: \n")
+    # print(train_dataset)
+    # # print(check_number(train_dataset))
+    # print(train_dataset.dataset_size)
+    # print("Below is the information of evaluation dataset: \n")
+    # print(eval_dataset)
+    # # print(check_number(eval_dataset))
+    # print(eval_dataset.dataset_size)
 
     # Initialize our Trainer
-    trainer = DoReMiTrainer(
+    trainer = DoReMiBucketTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,

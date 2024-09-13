@@ -163,7 +163,7 @@ class DataTrainingArguments:
 @dataclass
 class FullTrainingArguments(TrainingArguments):
     domain_config_path: str = field(
-        default='.', metadata={"help": "Path to the domain config file."}
+        default='/home/wth/My_codes/doremi/configs', metadata={"help": "Path to the domain config file."}
             )
     lr_end: float = field(
             default=1e-3,
@@ -193,7 +193,7 @@ class FullTrainingArguments(TrainingArguments):
         default=False, metadata={"help": "Don't evaluate perplexity."}
     )
     downstream_datasets: str = field(
-            default=None, metadata={"help": "Comma-delimited list of dataset names from: {trivia_qa, web_questions, lambada, natural_questions, squad_v2}"}
+            default=None, metadata={"help": "Comma-delimited list of dataset names from: {trivia_qa, web_questions, natural_questions, lambada, squad_v2}"}
     )
     eval_all_checkpoints: bool = field(
         default=False, metadata={"help": "Evaluate all the checkpoints at once."}

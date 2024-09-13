@@ -1,4 +1,4 @@
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, load_from_disk
 import string
 
 
@@ -20,8 +20,12 @@ def pred_postprocess_default(pred):
 
 
 def eval_func_default(answer, pred, prompt, model=None, tokenizer=None, inputs=None, trainer=None):
-    if not isinstance(answer, list):
+    # print(answer)
+    # print(type(answer))
+    if isinstance(answer, str):
         answer = [answer.strip().lower().translate(str.maketrans('', '', string.punctuation))]
+    elif isinstance(answer, dict):
+        answer = [answer["value"].strip().lower().translate(str.maketrans('', '', string.punctuation))]
     else:
         answer = [a.strip().lower().translate(str.maketrans('', '', string.punctuation)) for a in answer]
     return pred in answer
@@ -42,7 +46,8 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
 
     # load fewshot dataset
     if dataset_name == 'trivia_qa':
-        dataset = load_dataset(dataset_name, name='rc.nocontext')
+        # dataset = load_dataset("mandarjoshi/trivia_qa", "rc.nocontext")
+        dataset = load_from_disk("/home/wth/My_codes/doremi/data/eval_data/trivia_qa")
         dataset_train = dataset['train']
         dataset_val = dataset['validation']
         input_key = 'question'
@@ -56,7 +61,8 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
             return {'prompt': prompt, 'answer': answer_list}
 
     elif dataset_name == 'natural_questions':
-        dataset = load_dataset("lucadiliello/naturalquestionsshortqa")
+        # dataset = load_dataset("lucadiliello/naturalquestionsshortqa")
+        dataset = load_from_disk("/home/wth/My_codes/doremi/data/eval_data/natural_questions")
         dataset_train = dataset['train']
         dataset_val = dataset['validation']
 
@@ -69,7 +75,8 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
             return {'prompt': prompt, 'answer': answer_list}
 
     elif dataset_name == 'web_questions':
-        dataset = load_dataset(dataset_name)
+        # dataset = load_dataset("Stanford/web_questions")
+        dataset = load_from_disk("/home/wth/My_codes/doremi/data/eval_data/web_questions")
         dataset_train = dataset['train']
         dataset_val = dataset['test']
 
@@ -82,7 +89,8 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
             return {'prompt': prompt, 'answer': answer_list}
 
     elif dataset_name == 'lambada':
-        dataset = load_dataset(dataset_name)
+        # dataset = load_dataset("cimec/lambada")
+        dataset = load_from_disk("/home/wth/My_codes/doremi/data/eval_data/lambada")
         dataset_train = dataset['validation']
         dataset_val = dataset['test']
 
@@ -101,8 +109,9 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
             return {'prompt': prompt, 'answer': answer_list}
 
     elif dataset_name == 'squad_v2':
-        dataset = load_dataset(dataset_name)
-        # dataset_train = dataset['train']
+        # dataset = load_dataset("rajpurkar/squad_v2")
+        dataset = load_from_disk("/home/wth/My_codes/doremi/data/eval_data/squad_v2")
+        dataset_train = dataset['train']
         shuffle_train = False
 
         dataset_val = dataset['validation']
@@ -136,8 +145,10 @@ def get_eval_dataset(dataset_name, num_shots, seed=42):
             return {'prompt': prompt, 'answer': answer_list}
 
         def eval_func(answer, pred, prompt, model, tokenizer, inputs, trainer):
-            if not isinstance(answer, list):
+            if isinstance(answer, str):
                 answer = [answer.strip().lower().translate(str.maketrans('', '', string.punctuation))]
+            elif isinstance(answer, dict):
+                answer = [answer["value"].strip().lower().translate(str.maketrans('', '', string.punctuation))]
             else:
                 answer = [a.strip().lower().translate(str.maketrans('', '', string.punctuation)) for a in answer]
             return pred in answer

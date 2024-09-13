@@ -15,8 +15,7 @@ logger = get_logger(__name__)
 RANDOM_BATCH_SIZE = 8192
 DEFAULT_SEED=111
 
-class UpdatableRandomlyCyclingMultiSourcesExamplesIterable(
-        RandomlyCyclingMultiSourcesExamplesIterable):
+class UpdatableRandomlyCyclingMultiSourcesExamplesIterable(RandomlyCyclingMultiSourcesExamplesIterable):
 
     def __init__(self, ex_iterables, generator, probabilities=None, probabilities_handle=None, stopping_strategy="all_exhausted"):
         '''
@@ -175,6 +174,79 @@ def get_pile_datasets(
         seed += 1
     return all_ds
 
+def get_slim_datasets(
+        preprocessed_dir,
+        cache_dir=None,
+        split="train",
+        seed=DEFAULT_SEED,
+        domain_weights=None,
+        domain_names=None,
+        num_skip_examples=0,
+        shuffle=False,
+        shard_reversal=False,
+        keep_in_memory=False
+):
+    domain_name_to_skip_num = determine_skip_per_domain(num_skip_examples, seed, domain_weights, domain_names)
+
+    preprocessed_dir = Path(preprocessed_dir) / split
+    print(preprocessed_dir)
+    all_ds = {}
+    for domain_dir in preprocessed_dir.iterdir():
+        if split == "train":
+            shards = list(domain_dir.iterdir())
+            random.Random(seed).shuffle(shards)
+            if shard_reversal:
+                shards = list(reversed(shards))
+        else:
+            shards = [domain_dir]
+        ds = IterableDataset.from_generator(
+                skippable_data_gen,
+                gen_kwargs={'shards': shards,
+                            'num_skip_examples': domain_name_to_skip_num[domain_dir.name],
+                            'loop': (split == 'train'),
+                            'seed': seed,
+                            'shuffle': shuffle}
+                )
+        all_ds[domain_dir.name] = ds
+        seed += 1
+    return all_ds
+
+def get_md_datasets(
+        preprocessed_dir,
+        cache_dir=None,
+        split="train",
+        seed=DEFAULT_SEED,
+        domain_weights=None,
+        domain_names=None,
+        num_skip_examples=0,
+        shuffle=False,
+        shard_reversal=False,
+        keep_in_memory=False
+):
+    domain_name_to_skip_num = determine_skip_per_domain(num_skip_examples, seed, domain_weights, domain_names)
+    preprocessed_dir = Path(preprocessed_dir) / split
+    all_ds = {}
+    for domain_dir in preprocessed_dir.iterdir():
+        if split == "train":
+            shards = list(domain_dir.iterdir())
+            random.Random(seed).shuffle(shards)
+            if shard_reversal:
+                shards = list(reversed(shards))
+        else:
+            shards = [domain_dir]
+        ds = IterableDataset.from_generator(
+            skippable_data_gen,
+            gen_kwargs={
+                'shards': shards,
+                'num_skip_examples': domain_name_to_skip_num[domain_dir.name],
+                'loop': (split == 'train'),
+                'seed': seed,
+                'shuffle': shuffle
+            }
+        )
+        all_ds[domain_dir.name] = ds
+        seed += 1
+    return all_ds
 
 def get_perdomain_datasets(
         preprocessed_dir,
@@ -282,6 +354,32 @@ def get_preprocessed_mixed_dataset(
                 shuffle=shuffle,
                 shard_reversal=shard_reversal,
                 keep_in_memory=keep_in_memory)
+    elif dataset_name == "slimpajama":
+        all_ds = get_slim_datasets(
+            preprocessed_dir,
+            cache_dir=cache_dir,
+            split=split,
+            seed=seed,
+            domain_weights=domain_weights,
+            domain_names=domain_names,
+            num_skip_examples=num_skip_examples,
+            shuffle=shuffle,
+            shard_reversal=shard_reversal,
+            keep_in_memory=keep_in_memory
+    )
+    elif dataset_name == "md":
+        all_ds = get_md_datasets(
+            preprocessed_dir,
+            cache_dir=cache_dir,
+            split=split,
+            seed=seed,
+            domain_weights=domain_weights,
+            domain_names=domain_names,
+            num_skip_examples=num_skip_examples,
+            shuffle=shuffle,
+            shard_reversal=shard_reversal,
+            keep_in_memory=keep_in_memory
+        )
     else:
         try:
             all_ds = get_perdomain_datasets(
@@ -346,26 +444,32 @@ def get_preprocessed_mixed_dataset(
 
 def get_data_collator(tokenizer, return_tensors='pt', do_padding=False, max_length=1024):
     def data_collator(features):
+        new_features = []
+        for feature in features:
+            if "text" in feature.keys() or "meta" in feature.keys():
+                del feature["text"]
+                del feature["meta"]
+            new_features.append(feature)
         if not do_padding:
             try:
                 batch = {
-                        k: torch.tensor([f[k] for f in features])
-                        for k in features[0].keys()
+                        k: torch.tensor([f[k] for f in new_features])
+                        for k in new_features[0].keys()
                         }
             except Exception:
                 # try padding
                 batch = tokenizer.pad(
-                        [{k: v for k, v in f.items() if k not in {'domain_id', 'domain_ids'}} for f in features],
+                        [{k: v for k, v in f.items() if k not in {'domain_id', 'domain_ids'}} for f in new_features],
                         return_tensors=return_tensors,
                         pad_to_multiple_of=max_length)
 
-                if 'domain_id' in features[0]:
-                    batch['domain_id'] = torch.tensor([f['domain_id'] for f in features])
-                elif 'domain_ids' in features[0]:
-                    batch['domain_ids'] = torch.tensor([f['domain_ids'] for f in features])
+                if 'domain_id' in new_features[0]:
+                    batch['domain_id'] = torch.tensor([f['domain_id'] for f in new_features])
+                elif 'domain_ids' in new_features[0]:
+                    batch['domain_ids'] = torch.tensor([f['domain_ids'] for f in new_features])
 
         else:
-            batch = tokenizer.pad(features, return_tensors=return_tensors, pad_to_multiple_of=max_length)
+            batch = tokenizer.pad(new_features, return_tensors=return_tensors, pad_to_multiple_of=max_length)
         batch['input_ids'] = batch['input_ids'].long()
         if 'attention_mask' not in batch:
             batch['attention_mask'] = torch.ones_like(batch['input_ids']).long()
