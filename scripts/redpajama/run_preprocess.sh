@@ -6,7 +6,7 @@ NUM_SUBSETS=$3
 set -x
 
 # load global parameters
-source constants.sh
+source /home/wth/My_codes/doremi/scripts/redpajama/rp_constants.sh
 
 mkdir -p ${CACHE}/logs
 
@@ -18,15 +18,15 @@ export HF_DATASETS_IN_MEMORY_MAX_SIZE=0
 export TORCH_EXTENSIONS_DIR=$CACHE
 export TMPDIR=$CACHE
 
-cd ${DOREMI_DIR}
+cd ${DOREMI_DIR}cd ..
 
-python scripts/redpajama/preprocess.py \
-	--dataset_dir ${RP_DIR} \
-	--output_dir ${CACHE}/preprocessed_rp \
+python preprocess.py \
+	--dataset_dir ${SLIM_DIR} \
+	--output_dir ${PREPROCESSED_SLIM_DIR}/preprocessed_rp \
         --cache_dir ${CACHE} \
 	--domain $DOMAIN \
         --max_length 2048 \
-        --nproc 95 \
+        --nproc 1 \
         --num_subsets ${NUM_SUBSETS} \
         --subset ${SUBSET} \
 	--num_validation_examples 1000000 \
