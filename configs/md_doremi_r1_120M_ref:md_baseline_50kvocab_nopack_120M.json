@@ -1,0 +1,24 @@
+{
+  "train_domain_weights": {
+    "train_Open-Orca-1million-gpt-4": 0.02979172021150589,
+    "train_allenai-WildChat-1m": 0.05115874111652374,
+    "train_alpaca_chat_turn2": 0.004636398516595364,
+    "train_alpaca_de_49963": 0.016051363199949265,
+    "train_alpaca_es_51942": 0.019659163430333138,
+    "train_alpaca_fr_55178": 0.19807559251785278,
+    "train_alpaca_gpt4": 0.014385501854121685,
+    "train_alpaca_it_51710": 0.02109314315021038,
+    "train_alpaca_ja_51999": 0.009794098325073719,
+    "train_alpaca_ko_49620": 0.2284305989742279,
+    "train_alpaca_pt_51759": 0.17986124753952026,
+    "train_alpaca_ru_29822": 0.16659563779830933,
+    "train_alpaca_zh_48818": 0.017774825915694237,
+    "train_jondurbin-airoboros-3.2": 0.0039168456569314,
+    "train_lmsys-chat-1m": 0.006622377783060074,
+    "train_slimorca": 0.013305965811014175,
+    "train_teknium-GPTeacher-General-Instruct": 0.01884809136390686
+  },
+  "eval_domain_weights": {
+    "val": 1.0
+  }
+}

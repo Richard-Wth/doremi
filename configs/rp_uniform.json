@@ -1,2 +1,20 @@
-{"train_domain_weights": {"common_crawl": 0.1428, "c4": 0.1428, "github": 0.1428, "wikipedia": 0.1428, "book": 0.1428, "arxiv": 0.1428, "stackexchange": 0.1428}, "eval_domain_weights": {"common_crawl": 0.1428, "c4": 0.1428, "github": 0.1428, "wikipedia": 0.1428, "book": 0.1428, "arxiv": 0.1428, "stackexchange": 0.1428}}
-
+{
+    "train_domain_weights": {
+        "RedPajamaCommonCrawl": 0.1428,
+        "RedPajamaC4": 0.1428,
+        "RedPajamaGithub": 0.1428,
+        "RedPajamaWikipedia": 0.1428,
+        "RedPajamaBook": 0.1428,
+        "RedPajamaArXiv": 0.1428,
+        "RedPajamaStackExchange": 0.1428
+    },
+    "eval_domain_weights": {
+        "RedPajamaCommonCrawl": 0.1428,
+        "RedPajamaC4": 0.1428,
+        "RedPajamaGithub": 0.1428,
+        "RedPajamaWikipedia": 0.1428,
+        "RedPajamaBook": 0.1428,
+        "RedPajamaArXiv": 0.1428,
+        "RedPajamaStackExchange": 0.1428
+    }
+}
