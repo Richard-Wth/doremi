@@ -11,7 +11,7 @@ from transformers import AutoTokenizer
 
 
 PILE_DOMAINS = ['ArXiv', 'BookCorpus2', 'Books3', 'DM Mathematics', 'Enron Emails', 'EuroParl', 'FreeLaw', 'Github', 'Gutenberg (PG-19)', 'HackerNews', 'NIH ExPorter', 'OpenSubtitles', 'OpenWebText2', 'PhilPapers', 'Pile-CC', 'PubMed Abstracts', 'PubMed Central', 'StackExchange', 'USPTO Backgrounds', 'Ubuntu IRC', 'Wikipedia (en)', 'YoutubeSubtitles']
-
+SLIM_DOMAINS = ['RedPajamaCommonCrawl', 'RedPajamaC4', 'RedPajamaGithub', 'RedPajamaWikipedia', 'RedPajamaBook', 'RedPajamaArXiv', 'RedPajamaStackExchange']
 
 def compute_pile_baseline_weights(preprocessed_dir, cache_dir, nopack=False, tokenizer=None):
 
@@ -85,13 +85,165 @@ def compute_pile_baseline_weights(preprocessed_dir, cache_dir, nopack=False, tok
     print("Baseline domain weights:", domain_lens)
     return domain_lens
 
+def compute_slimpajama_baseline_weights(preprocessed_dir, nopack=True, tokenizer=None):
+    preprocessed_dir = Path(preprocessed_dir) / 'train'
+
+    def process_shard(shard_dir):
+        curr_count = 0
+        ds = load_from_disk(dataset_path=str(shard_dir))
+        if nopack:
+            # in the DoReMi paper, we first padded to the context length then counted
+            # the number of chunks, and dynamically packed the examples
+            # together (possibly even from different domains)
+            num_tokens_in_curr_doc = 0
+            chunk_size = 2048
+            for ex in tqdm(ds):
+                toks = ex['input_ids']
+                sep_idxs = [i for i in range(len(toks)) if toks[i] == tokenizer.eos_token_id]
+                if len(sep_idxs) > 0:
+                    prev_sep_idx = -1
+                    for sep_idx in sep_idxs:
+                        num_tokens_in_curr_doc += sep_idx - prev_sep_idx - 1
+                        prev_sep_idx = sep_idx
+                        curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+                        num_tokens_in_curr_doc = 0
+                    if prev_sep_idx != len(toks) - 1:
+                        num_tokens_in_curr_doc += len(toks) - prev_sep_idx - 1
+                else:
+                    num_tokens_in_curr_doc += len(toks)
+            if num_tokens_in_curr_doc > 0:
+                curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+        else:
+            curr_count = len(ds)
+
+        return curr_count
+        
+    domain_lens = defaultdict(int)
+    for domain_dir in preprocessed_dir.iterdir():
+        print("Counting domain", domain_dir.name)
+        counts = Parallel(n_jobs=30)(delayed(process_shard)(shard_dir) for shard_dir in domain_dir.iterdir())
+        domain_lens[domain_dir.name] = sum(counts)
+
+    # multiply by epochs to get weights according to effective sizes
+    slim_epochs = {
+        "RedPajamaCommonCrawl": 1.0,
+        "RedPajamaC4": 1.0,
+        "RedPajamaGithub": 1.0,
+        "RedPajamaWikipedia": 1.0,
+        "RedPajamaBook": 1.0,
+        "RedPajamaArXiv": 1.0,
+        "RedPajamaStackExchange": 1.0
+    }
+    domain_lens = {k: v * slim_epochs[k] for k, v in domain_lens.items()}
+
+    # renormalize domain_lens
+    total_len = sum(domain_lens.values())
+    domain_lens = {k: v / total_len for k, v in domain_lens.items()}
+    print("Baseline domain weights:", domain_lens)
+    return domain_lens
+
+def compute_slimpajama_bucket_baseline_weights(preprocessed_dir, split='train', nopack=True, tokenizer=None):
+    preprocessed_dir = Path(preprocessed_dir) / split
+    def process_shard(shard_dir):
+        curr_count = 0
+        ds = load_from_disk(dataset_path=str(shard_dir))
+        if nopack:
+            # in the DoReMi paper, we first padded to the context length then counted
+            # the number of chunks, and dynamically packed the examples
+            # together (possibly even from different domains)
+            num_tokens_in_curr_doc = 0
+            chunk_size = 2048
+            for ex in tqdm(ds):
+                toks = ex['input_ids']
+                sep_idxs = [i for i in range(len(toks)) if toks[i] == tokenizer.eos_token_id]
+                if len(sep_idxs) > 0:
+                    prev_sep_idx = -1
+                    for sep_idx in sep_idxs:
+                        num_tokens_in_curr_doc += sep_idx - prev_sep_idx - 1
+                        prev_sep_idx = sep_idx
+                        curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+                        num_tokens_in_curr_doc = 0
+                    if prev_sep_idx != len(toks) - 1:
+                        num_tokens_in_curr_doc += len(toks) - prev_sep_idx - 1
+                else:
+                    num_tokens_in_curr_doc += len(toks)
+            if num_tokens_in_curr_doc > 0:
+                curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+        else:
+            curr_count = len(ds)
+        return curr_count
+    
+    domain_lens = defaultdict(int)
+    buckets_num = 0
+    for domain_dir in preprocessed_dir.iterdir():
+        buckets_num += 1
+        print("Counting domain", domain_dir.name)
+        print(f"The number of buckets is: {buckets_num}")
+        counts = Parallel(n_jobs=30)(delayed(process_shard)(shard_dir) for shard_dir in domain_dir.iterdir())
+        domain_lens[domain_dir.name] = sum(counts)
+
+    # renormalize domain_lens
+    total_len = sum(domain_lens.values())
+    domain_lens = {k: v / total_len for k, v in domain_lens.items()}
+    print("Baseline domain weights:", domain_lens)
+    return domain_lens
+
+def compute_md_baseline_weights(preprocessed_dir, split='train', nopack=True, tokenizer=None):
+    preprocessed_dir = Path(preprocessed_dir) / split
+    def process_shard(shard_dir):
+        curr_count = 0
+        if split == "train":
+            ds = load_from_disk(dataset_path=str(shard_dir))["train"]
+        else:
+            ds = load_from_disk(dataset_path=str(shard_dir))
+        if nopack:
+            # in the DoReMi paper, we first padded to the context length then counted
+            # the number of chunks, and dynamically packed the examples
+            # together (possibly even from different domains)
+            num_tokens_in_curr_doc = 0
+            chunk_size = 1024
+            for ex in tqdm(ds):
+                toks = ex['input_ids']
+                sep_idxs = [i for i in range(len(toks)) if toks[i] == tokenizer.eos_token_id]
+                if len(sep_idxs) > 0:
+                    prev_sep_idx = -1
+                    for sep_idx in sep_idxs:
+                        num_tokens_in_curr_doc += sep_idx - prev_sep_idx - 1
+                        prev_sep_idx = sep_idx
+                        curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+                        num_tokens_in_curr_doc = 0
+                    if prev_sep_idx != len(toks) - 1:
+                        num_tokens_in_curr_doc += len(toks) - prev_sep_idx - 1
+                else:
+                    num_tokens_in_curr_doc += len(toks)
+            if num_tokens_in_curr_doc > 0:
+                curr_count += math.ceil(num_tokens_in_curr_doc / chunk_size)
+        else:
+            curr_count = len(ds)
+        return curr_count
+    
+    domain_lens = defaultdict(int)
+    domain_num = 0
+    print(preprocessed_dir)
+    for domain_dir in preprocessed_dir.iterdir():
+        domain_num += 1
+        print("Counting domain", domain_dir.name)
+        print(f"The number of domains is: {domain_num}")
+        counts = Parallel(n_jobs=30)(delayed(process_shard)(shard_dir) for shard_dir in domain_dir.iterdir())
+        domain_lens[domain_dir.name] = sum(counts)
+
+    # renormalize domain_lens
+    total_len = sum(domain_lens.values())
+    domain_lens = {k: v / total_len for k, v in domain_lens.items()}
+    print("Baseline domain weights:", domain_lens)
+    return domain_lens
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_name", type=str, default="baseline")
     parser.add_argument("--preprocessed_dir", type=str, default="/path/to/preprocessed")
     parser.add_argument("--cache_dir", type=str, default="/path/to/cache")
-    parser.add_argument("--nopack", action='store_true')
+    parser.add_argument("--nopack", type=bool, default=True)
     parser.add_argument("--tokenizer", type=str, default='togethercomputer/RedPajama-INCITE-Base-7B-v0.1')
     args = parser.parse_args()
 
@@ -170,20 +322,84 @@ def main():
             "train_domain_weights": domain_weights,
             "eval_domain_weights": domain_weights,
             }
-    elif args.config_name == 'rp_baseline':
-        domain_weights = {
-                'common_crawl': 0.7316,
-                'c4': 0.1458,
-                'github': 0.0492,
-                'wikipedia': 0.02,
-                'book': 0.0216,
-                'arxiv': 0.0233,
-                'stackexchange': 0.016,
+    # elif args.config_name == 'rp_baseline':
+    #     domain_weights = {
+    #             'common_crawl': 0.7316,
+    #             'c4': 0.1458,
+    #             'github': 0.0492,
+    #             'wikipedia': 0.02,
+    #             'book': 0.0216,
+    #             'arxiv': 0.0233,
+    #             'stackexchange': 0.016,
+    #     }
+    #     config = {
+    #         "train_domain_weights": domain_weights,
+    #         "eval_domain_weights": domain_weights,
+    #         }
+    elif args.config_name == 'slim_baseline_50kvocab_nopack':
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+        domain_weights = compute_slimpajama_baseline_weights(
+            args.preprocessed_dir,
+            args.nopack,
+            tokenizer
+        )
+        config = {
+            "train_domain_weights": domain_weights,
+            "eval_domain_weights": domain_weights,
         }
+    elif args.config_name == 'slim_baseline_50kvocab_nopack_bucket':
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+        train_domain_weights = compute_slimpajama_bucket_baseline_weights(
+            args.preprocessed_dir,
+            split='train',
+            nopack=args.nopack,
+            tokenizer=tokenizer
+        )
+        val_domain_weights = compute_slimpajama_bucket_baseline_weights(
+            args.preprocessed_dir,
+            split='validation',
+            nopack=args.nopack,
+            tokenizer=tokenizer
+        )
+        config = {
+            "train_domain_weights": train_domain_weights,
+            "eval_domain_weights": val_domain_weights,
+        }
+    elif args.config_name == 'slim_baseline_50kvocab_pack':
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+        domain_weights = compute_slimpajama_baseline_weights(
+            args.preprocessed_dir,
+            args.nopack,
+            tokenizer
+        )
+        config = {
+            "train_domain_weights": domain_weights,
+            "eval_domain_weights": domain_weights,
+        }
+    elif args.config_name == "slim_uniform":
+        domain_weights = {d: 1 / len(SLIM_DOMAINS) for d in SLIM_DOMAINS}
         config = {
             "train_domain_weights": domain_weights,
             "eval_domain_weights": domain_weights,
             }
+    elif args.config_name == 'md_baseline_50kvocab_nopack':
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+        train_domain_weights = compute_md_baseline_weights(
+            args.preprocessed_dir,
+            split='train',
+            nopack=args.nopack,
+            tokenizer=tokenizer
+        )
+        val_domain_weights = compute_md_baseline_weights(
+            args.preprocessed_dir,
+            split='validation',
+            nopack=args.nopack,
+            tokenizer=tokenizer
+        )
+        config = {
+            "train_domain_weights": train_domain_weights,
+            "eval_domain_weights": val_domain_weights,
+        }
     else:
         raise ValueError(f"Unknown config name {args.config_name}")
 

@@ -53,7 +53,7 @@ def main():
     parser.add_argument('--num_validation_examples', type=int, default=1000000)
     parser.add_argument('--max_length', type=int, default=2048)
     parser.add_argument('--nproc', type=int, default=8)
-    parser.add_argument('--tokenizer', type=str, default='togethercomputer/RedPajama-INCITE-Base-7B-v0.1')
+    parser.add_argument('--tokenizer', type=str, default='/home/wth/My_codes/doremi/tokenizer')
     parser.add_argument('--cache_dir', type=str, default='/path/to/cache')
     parser.add_argument('--seed', type=int, default=111)
     args = parser.parse_args()
@@ -98,7 +98,7 @@ def main():
             single="$A "+tokenizer.eos_token,
             special_tokens=[(tokenizer.eos_token, tokenizer.eos_token_id)])
     transform = get_transform(tokenizer, args.max_length, DOMAIN_TO_IDX[args.domain], seed=args.seed)
-    if args.domain not in {'book', 'github'}:
+    if args.domain not in {'RedPajamaBook', 'RedPajamaGithub'}:
         ds = load_dataset('json',
                           data_files=data_files,
                           cache_dir=args.cache_dir,
@@ -109,10 +109,11 @@ def main():
         else:
             num_validation_examples = args.num_validation_examples
         ds_dict = ds.train_test_split(test_size=num_validation_examples, shuffle=True, seed=args.seed)
+        print(ds_dict)
 
 
-        ds_train = ds['train'].map(transform, batched=True, remove_columns=ds.column_names, num_proc=args.nproc)
-        ds_val = ds['test'].map(transform, batched=True, remove_columns=ds.column_names, num_proc=args.nproc)
+        ds_train = ds_dict['train'].map(transform, batched=True, remove_columns=ds.column_names, num_proc=args.nproc)
+        ds_val = ds_dict['test'].map(transform, batched=True, remove_columns=ds.column_names, num_proc=args.nproc)
     else:
         def data_gen(data_files):
             for data_file in data_files:
@@ -132,8 +133,9 @@ def main():
         else:
             num_validation_examples = args.num_validation_examples
         ds = ds.train_test_split(test_size=num_validation_examples, shuffle=True, seed=args.seed)
+        print(ds)
 
-        if args.domain == 'book':
+        if args.domain == 'RedPajamaBook':
             # books are very long
             batch_size = 10
         else:
@@ -147,9 +149,9 @@ def main():
         output_dir.parent.mkdir(parents=True, exist_ok=True)
         ds.save_to_disk(output_dir, max_shard_size='1GB', num_proc=args.nproc)
 
-    shutil.rmtree(str(Path(args.cache_dir) / 'downloads'))
-    shutil.rmtree(str(Path(args.cache_dir) / 'json'))
-    ds.cleanup_cache_files()
+    # shutil.rmtree(str(Path(args.cache_dir) / 'downloads'))
+    # shutil.rmtree(str(Path(args.cache_dir) / 'json'))
+    # ds.cleanup_cache_files()
 
 
 if __name__ == '__main__':

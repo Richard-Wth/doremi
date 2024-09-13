@@ -6,7 +6,7 @@
 
 
 # load global parameters
-source constants.sh
+source /home/wth/My_codes/doremi/Constants/constants.sh
 
 mkdir -p $CACHE
 export HF_HOME=$CACHE
@@ -17,6 +17,8 @@ export TORCH_EXTENSIONS_DIR=$CACHE
 export TMPDIR=$CACHE
 export WANDB_DIR=${CACHE}/wandb
 
+export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" 
+
 PREPROCESSED_DATA=${PREPROCESSED_PILE_DIR}
 
 ROUND=${1:-1}
@@ -24,7 +26,7 @@ REFERENCE_WEIGHTS_NAME=${2:-"pile_baseline_50kvocab_nopack"}
 arg=${3:-""} # set to eval to run eval
 
 if [[ "${arg}" == "eval" ]]; then
-    ADDITIONAL_ARGS="--evaluation_strategy steps --per_device_eval_batch_size 32 --do_train false --remove_unused_columns=False --downstream_datasets trivia_qa,web_questions,lambada,natural_questions,squad_v2 --skip_perplexity_eval --eval_all_checkpoints"
+    ADDITIONAL_ARGS="--evaluation_strategy steps --per_device_eval_batch_size 32 --do_train false --remove_unused_columns=False --downstream_datasets trivia_qa,web_questions,lambada,natural_questions --skip_perplexity_eval --eval_all_checkpoints"
 else
     ADDITIONAL_ARGS=""
 fi
@@ -36,26 +38,26 @@ accelerate launch \
     --num_machines 1 \
     --num_processes 8 \
     --multi_gpu \
-    --main_process_port 60400 \
+    --main_process_port 60403 \
     doremi/train.py \
     --dataset_name pile \
     --model_type gpt_flash \
-    --tokenizer_name togethercomputer/RedPajama-INCITE-Base-7B-v0.1 \
+    --tokenizer_name /home/wth/My_codes/doremi/tokenizer \
     --do_train \
     --cache_dir ${CACHE} \
     --dataset_dir ${PREPROCESSED_DATA} \
     --domain_config_path configs/pile_doremi_r${ROUND}_120M_ref:${REFERENCE_WEIGHTS_NAME}_120M.json \
     --output_dir ${MODEL_OUTPUT_DIR}/${NAME} \
     --max_token_length 1024 \
-    --per_device_train_batch_size 64 \
+    --per_device_train_batch_size 8 \
     --gradient_accumulation_steps 1 \
     --dataloader_num_workers 1 \
-    --max_steps 200000 \
+    --max_steps 20000 \
     --save_strategy steps \
-    --save_steps 10000 \
+    --save_steps 1000 \
     --evaluation_strategy steps \
-    --eval_steps 10000 \
-    --per_device_eval_batch_size 32 \
+    --eval_steps 1000 \
+    --per_device_eval_batch_size 8 \
     --remove_unused_columns=False \
     --learning_rate 1e-3 \
     --lr_end 1e-4 \

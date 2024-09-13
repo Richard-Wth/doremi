@@ -5,7 +5,7 @@
 #
 
 # load global parameters
-source constants.sh
+source /home/wth/My_codes/doremi/Constants/constants.sh
 
 mkdir -p $CACHE
 export HF_HOME=$CACHE
@@ -15,6 +15,7 @@ export HF_DATASETS_IN_MEMORY_MAX_SIZE=0
 export TORCH_EXTENSIONS_DIR=$CACHE
 export TMPDIR=$CACHE
 export WANDB_DIR=${CACHE}/wandb
+# export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" 
 
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:12288
 
@@ -32,24 +33,24 @@ accelerate launch \
     --num_processes 8 \
     --multi_gpu \
     --num_machines 1 \
-    --main_process_port 60600 \
+    --main_process_port 60604 \
     doremi/train.py \
     --dataset_name pile \
     --model_type gpt_flash \
-    --tokenizer_name togethercomputer/RedPajama-INCITE-Base-7B-v0.1 \
+    --tokenizer_name /home/wth/My_codes/doremi/tokenizer \
     --do_train \
     --cache_dir ${CACHE} \
     --dataset_dir ${PREPROCESSED_PILE_DIR} \
     --domain_config_path configs/pile_uniform.json \
     --output_dir ${MODEL_OUTPUT_DIR}/${NAME} \
     --max_token_length 1024 \
-    --per_device_train_batch_size 64 \
+    --per_device_train_batch_size 8 \
     --gradient_accumulation_steps 1 \
     --dataloader_num_workers 1 \
-    --max_steps 200000 \
+    --max_steps 20000 \
     --evaluation_strategy no \
     --save_strategy steps \
-    --save_steps 10000 \
+    --save_steps 1000 \
     --learning_rate 1e-3 \
     --lr_end 1e-4 \
     --weight_decay 0.01 \
@@ -71,7 +72,7 @@ accelerate launch \
     --reweight_eps 1e-3 \
     --reweight_domains \
     --remove_unused_columns=False \
-    --reference_model_name_or_path ${MODEL_OUTPUT_DIR}/${REFERENCE_MODEL_NAME}/checkpoint-200000 \
+    --reference_model_name_or_path ${MODEL_OUTPUT_DIR}/${REFERENCE_MODEL_NAME}/checkpoint-20000 \
     --bf16 \
     --shuffle \
     --config_overrides="n_positions=1024,n_embd=768,n_layer=12,n_head=12,rotary_emb_fraction=0.25,tie_word_embeddings=True,scale_attn_by_inverse_layer_idx=False,embd_pdrop=0.0,resid_pdrop=0.0,attn_pdrop=0.0,eos_token_id=0,bos_token_id=0,max_position_embeddings=0,vocab_size=50277" \
