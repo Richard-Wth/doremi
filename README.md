@@ -55,6 +55,14 @@ top_level/
 where each inner directory (e.g., `domain_name_1`) can be loaded via HuggingFace's `load_from_disk` method. If your data is in a different format, you can add a custom data loading function in `doremi/dataloader.py`.
 You will also need to write a config file and save it to `configs/` and write run scripts similar to `scripts/runs/run_pile_baseline120M.sh` and `scripts/runs/run_pile_doremi120M.sh` which refer to the config file. The config file specifies the mapping from domain name to mixture weight. The names do not have to be in order (DoReMi will always sort the domain names first to determine a fixed ordering) and the weights do not have to be normalized.
 
+### Running DoReMi on Multi-Domain dataset
+To run DoReMi on Multi-Domain dataset, you only need to run the script in the following:
+```
+bash scripts/multi_domain/run_baseline.sh
+bash scripts/multi_domain/run_proxy.sh
+bash scripts/multi_domain/run_main.sh
+```
+
 ## Tips and details
 - **Choice of reference domain weights**: In general, the reference domain weights are a way to express a prior over the importance of the domains. A reasonable default is to set the reference model's domain weights according to the size of each domain, which ensures that the small domains will not be overrepresented (and be overfit). If certain domains are particularly important, you can certainly increase its corresponding reference domain weight. Uniform domain weights could be used as the reference domain weights to avoid putting any prior on the domain weights, but iterated DoReMi will likely be needed (see below).
 - **Iterated DoReMi**: In some cases, you may need to run more than 1 round of DoReMi. To run iterated DoReMi, we train a new reference model using the optimized domain weights from the previous round. This helps especially if you start with suboptimal reference domain weights (such as uniform weights), where the reference model trained using those weights will also be suboptimal.
